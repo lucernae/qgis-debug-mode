@@ -11,4 +11,4 @@ before_install:
     - pip install -U docker-compose
 
 script:
-    - docker-compose --build-arg QGIS_VERSION=${QGIS_VERSION} build
+    - docker-compose build --build-arg QGIS_VERSION=${QGIS_VERSION}
