@@ -1,3 +1,14 @@
 services:
     - docker
 language: python
+
+env:
+    matrix:
+        - QGIS_VERSION=latest
+        - QGIS_VERSION=release-3_14
+
+before_install:
+    - pip install -U docker-compose
+
+script:
+    - docker-compose --build-arg QGIS_VERSION=${QGIS_VERSION} build
