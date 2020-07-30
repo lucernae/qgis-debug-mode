@@ -23,12 +23,180 @@ To use the image:
 
 Let's say we want to run debugging using GDB and view the interface (using VNC, not Xvfb).
 
-Copy `resources/sample_debugger_scripts/gdb/docker-compose.override.yml` to `docker-compose.override.yml`. Location all relative to repo root directory.
+Copy `resources/sample_debugger_scripts/gdb/docker-compose.override.yml` to `docker-compose.override.yml`. All location are relative to repo's root directory.
+
+To use VNC Display, change into this:
+
+```yaml
+version: '3'
+services: 
+    qgis:
+        command: gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis
+        environment: 
+            # VNC Display uses DISPLAY :98
+            DISPLAY: ":98"
+        ports: 
+            - "34567:34567"
+```
+
+Short explanation:
+- We are running gdbserver on the container and expose it to port 34567, then run prebuilt QGIS binary located in `/QGIS/build/output/bin/qgis`
+- We are using Tightvncserver display in DISPLAY :98
+- We are exposing port 34567 to host, so local gdb client can connect to it
+
+Run the services:
+
+```yaml
+docker-compose up -d
+```
+
+VNC port are exposed to port `5998` (which is 5900 + Display number). These rules are declared in the main `docker-compose.yml` file. You can connect to it using VNC Viewer application with default credentials:
+
+    host: localhost:5998
+    user: root
+    pass: userpass
+
+With above gdbserver command, QGIS will run when gdb has connected.
+How you connect to it depends on the IDE you choose, but to quickly check it, run gdb and perform internal command:
 
 ```bash
+gdb
+gdb> target remote localhost:34567
+gdb> info sources
+```
+
+# Customization
+
+To do some various things and modifications, see example below.
+
+## Use different CMAKE_OPTIONS
+
+Changing cmake behaviour can be done via docker build variable `CMAKE_OPTIONS`.
+
+Using docker build:
+
+```bash
+docker build --build-arg CMAKE_OPTIONS=<super long CMAKE Flags> -t local/qgis-debug .
+```
+
+Using docker-compose build:
+
+```bash
+docker-compose --build-arg CMAKE_OPTIONS=<super long CMAKE flags> build
+```
+
+Using Docker Hub, just set CMAKE_OPTIONS in the autobuild settings for the build args.
+
+
+## Extracting build cache
+
+Inside the containers, the project directory is in `/QGIS`. The cmake build directory is in `/QGIS/build`. The CCACHE_DIR is in `/QGIS/.ccache_image_build`. Simply use docker cp to extract this out. You can look at example in [sync-cache.sh](scripts/sync-cache.sh)
+
+After it was extracted, you can volume mount those directory to make sure any changes for the build are persisted. This is very useful if you do debug + edit workflow.
+Since recompiling means you need to change the source code, don't forget to mount the source code from your local QGIS repo:
+
+Some sample `docker-compose.override.yml` with this intention.
+
+```yaml
+version: '3'
+services: 
+    qgis:
+        command: gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis
+        environment: 
+            DISPLAY: ":98"
+        ports: 
+            - "34567:34567"
+        volumes: 
+            - ${QGIS_REPO}/build:/QGIS/build
+            - ${QGIS_REPO}/.ccache_image_build:/QGIS/.ccache_image_build
+            - ${QGIS_REPO}/src:/QGIS/src
+```
+
+Create a `.env` file in this project directory to let docker-compose know where `QGIS_REPO` is:
+
+```.env
+QGIS_REPO=/home/<user>/apps/QGIS/qgis
+```
+
+## Rebuilding using docker
+
+If you use other CMAKE flags, then you need to set it inside the docker-compose override recipe:
+
+```yaml
+version: '3'
+services:
+    qgis:
+        # I will only put relevant key in environment key
+        environment:
+            CMAKE_OPTIONS: "<super long CMAKE flags>"
 
 ```
 
-## Customizing QGIS Build options
+You need to apply the cmake conf:
 
-Customization can be built at runtime via environment variable `CMAKE_OPTIONS`
+```bash
+docker-compose exec qgis /build-debug.sh
+```
+
+For subsequent rebuilding, execute this command:
+
+```bash
+docker-compose exec qgis ninja install
+```
+
+You can hook above command to your IDE to make it autorebuild on demand.
+
+## Hooking extra preparation scripts
+
+You might want to hook extra scripts before your debug server/setup ready.
+The image is equipped with a `docker-entrypoint.sh` script that will execute extra `sh` scripts in the directory inside containers: `/docker-entrypoint-scripts.d`.
+
+So, if you want to include the scripts, customize your docker-compose override recipe:
+
+```yaml
+version: '3'
+services:
+    qgis:
+        # I will only put relevant key in environment key
+        volumes:
+            # Mounting a directory
+            - "${PWD}/your-scripts-dir:/docker-entrypoint-scripts.d
+            # Mounting a file
+            # - "${PWD}/your-script.sh:/docker-entrypoint-scripts.d/your-script.sh
+```
+
+These scripts are going to be executed when you first run `docker-compose up -d` in a fresh stack.
+
+Since there is a possible case where you want to install extra python modules/app, you can do that by mounting the requirements.txt file. Any file with name suffix `requirements.txt` will be inspected.
+
+```yaml
+version: '3'
+services:
+    qgis:
+        # I will only put relevant key in environment key
+        volumes:
+            # Mounting a python requirements.txt
+            - "${PWD}/my-dependencies.requirements.txt:/docker-entrypoint-scripts.my-dependencies.requirements.txt
+```
+
+## IDE Integrations
+
+I mainly uses VSCode and PyCharm.
+
+### VSCode
+
+To Debug C++ code, you can use VSCode
+
+#### Requirements
+
+- VSCode
+- Official C++ VSCode extension 
+- gdb
+
+In the `resources/sample_debugger_scripts/gdb` there are sample scripts usable by VSCode.
+
+The file `vs_code_launch.json` is for the `.vscode/launch.json` file. It is used to launch the debugger when user press F5 in vscode.
+
+Link the volume mount used by docker-compose in this repository with the same location in your QGIS repo openned by vscode. If you use `QGIS_REPO` environment variable, coupled with this setup: [Extracting build cache](#extracting-build-cache), then that means the `.ccache_image_build`, `build`, and `src` dir are linked with the location in your QGIS repo.
+
+Open the `launch.json` file in your `QGIS_REPO` and make sure it points to the correct host location of the program and debugger path.
