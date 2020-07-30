@@ -1,0 +1,6 @@
+version: '3'
+services: 
+    qgis:
+        command: gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis
+        ports: 
+            - "34567:34567"

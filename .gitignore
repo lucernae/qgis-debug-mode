@@ -1,0 +1,5 @@
+/docker-compose.override.yml
+/build
+.vscode
+.python-version
+.env

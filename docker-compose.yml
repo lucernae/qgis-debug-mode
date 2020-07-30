@@ -1,0 +1,12 @@
+version: '3'
+services: 
+    qgis:
+        build: .
+        image: local/qgis-debug
+        command: tail -f /dev/null
+        environment: 
+            # Use :99 for default XVfb
+            # Use :98 for default VNC
+            DISPLAY: ":99"
+        ports: 
+            - "5998:5998"
