@@ -22,8 +22,8 @@ RUN /build-debug.sh \
 
 # SSH support
 # Useful for debugging via SSH connections
-RUN apt -y update; apt -y install openssh-server
-RUN mkdir /var/run/sshd
+RUN apt -y update; apt -y install openssh-server rsync
+RUN mkdir -p /var/run/sshd
 ARG SSH_PASSWORD=docker
 RUN echo 'root:${SSH_PASSWORD}' | chpasswd
 # Allow login as root useful for development
@@ -47,6 +47,9 @@ ADD resources/xstartup /root/.vnc/xstartup
 # Entrypoint scripts
 # Useful to provide extra hooks before the container is up
 ADD scripts/docker-entrypoint.sh /docker-entrypoint.sh
+
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+RUN ln -sf /usr/bin/pip3 /usr/bin/pip
 
 ENTRYPOINT [ "/docker-entrypoint.sh" ]
 

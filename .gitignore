@@ -3,3 +3,5 @@
 .vscode
 .python-version
 .env
+user_scripts/*
+!/user_scripts/.gitkeep

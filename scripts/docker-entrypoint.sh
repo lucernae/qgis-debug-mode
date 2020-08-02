@@ -14,6 +14,9 @@ chmod 600 ~/.vnc/passwd
 
 USER=root /usr/bin/tightvncserver :98 &
 
+#  Run SSH in port 22
+/usr/sbin/sshd -D &
+
 # Wait for background process to finish
 sleep 10
 

@@ -7,6 +7,7 @@ Features:
 
 - Compiled with CMAKE_BUILD_TYPE: DEBUG
 - Include remote VNC connection
+- SSH + Rsync Server available
 - Entrypoint script injection abilities. It is able to run a script before container online
 
 # TLDR; Using the image
@@ -18,8 +19,12 @@ docker-compose build
 ```
 
 However, the point of creating this project is to let Docker Hub build your image so you can just use it immediately.
+So, I recommend that you clone the repo and built it yourself using docker hub, then pull it.
 
 To use the image:
+
+Copy `.example.env` as `.env` in the root project folder.
+This will contain environment variable override.
 
 Let's say we want to run debugging using GDB and view the interface (using VNC, not Xvfb).
 
@@ -31,7 +36,7 @@ To use VNC Display, change into this:
 version: '3'
 services: 
     qgis:
-        command: gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis
+        command: /bin/bash -c "while [ 'TRUE' ]; do gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis; done"
         environment: 
             # VNC Display uses DISPLAY :98
             DISPLAY: ":98"
@@ -69,6 +74,11 @@ gdb> info sources
 
 To do some various things and modifications, see example below.
 
+## Change environment variable
+
+Docker will use environment variable defined in `.env` file.
+Overriding those will change the value in docker-compose.yml file
+
 ## Use different CMAKE_OPTIONS
 
 Changing cmake behaviour can be done via docker build variable `CMAKE_OPTIONS`.
@@ -101,7 +111,7 @@ Some sample `docker-compose.override.yml` with this intention.
 version: '3'
 services: 
     qgis:
-        command: gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis
+        command: /bin/bash -c "while [ 'TRUE' ]; do gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis; done"
         environment: 
             DISPLAY: ":98"
         ports: 
@@ -112,11 +122,14 @@ services:
             - ${QGIS_REPO}/src:/QGIS/src
 ```
 
-Create a `.env` file in this project directory to let docker-compose know where `QGIS_REPO` is:
+Add new environment variable in `.env` file in this project directory to let docker-compose know where `QGIS_REPO` is:
 
 ```.env
 QGIS_REPO=/home/<user>/apps/QGIS/qgis
 ```
+
+In addition to that, it is sometimes useful to extract the headers file.
+The header files are located inside containers in dir `/usr/include`. You can copy this file along in your QGIS project repo.
 
 ## Rebuilding using docker
 
@@ -195,8 +208,33 @@ To Debug C++ code, you can use VSCode
 
 In the `resources/sample_debugger_scripts/gdb` there are sample scripts usable by VSCode.
 
-The file `vs_code_launch.json` is for the `.vscode/launch.json` file. It is used to launch the debugger when user press F5 in vscode.
+The file `resources/sample_debugger_scripts/gdb/.vscode/launch.json` is for the `.vscode/launch.json` file. It is used to launch the debugger when user press F5 in vscode.
+The file `resources/sample_debugger_scripts/gdb/.vscode/tasks.json` is for the `.vscode/tasks.json` file. It is used to run build task.
 
 Link the volume mount used by docker-compose in this repository with the same location in your QGIS repo openned by vscode. If you use `QGIS_REPO` environment variable, coupled with this setup: [Extracting build cache](#extracting-build-cache), then that means the `.ccache_image_build`, `build`, and `src` dir are linked with the location in your QGIS repo.
 
-Open the `launch.json` file in your `QGIS_REPO` and make sure it points to the correct host location of the program and debugger path.
+In the `launch.json` file there is an options to specify file mapping. You can specify source code map (from host to container), so that when gdbserver refer to a source code in the container, VSCode can understand that it refer the same file in your host directory.
+The highlighted settings are here:
+
+```json
+{
+          "sourceFileMap": {
+            // left are container filesystem: right are host filesystem
+            "/QGIS": "${workspaceRoot}",
+            // If you extracted the header files, you can also map it here
+            // "/usr/lib/include": "${workspaceRoot}/build/include"
+          },
+```
+
+In addition to that, since you will mostly debug Qt Framework, you can include gdb command definition in `resources/sample_debugger_scripts/gdb/.gdbinit` into your `~/.gdbinit`.
+This will allow you to print of Qt5 String in VSCode from the gdb terminal.
+From the debug console, execute:
+
+```gdb
+-exec printqs5static <qstring variable>
+```
+
+### PyCharm
+
+You can debug Python code (for plugins) using PyCharm Pro edition.
+

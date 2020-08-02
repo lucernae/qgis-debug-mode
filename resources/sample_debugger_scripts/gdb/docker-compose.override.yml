@@ -1,6 +1,19 @@
 version: '3'
 services: 
     qgis:
-        command: gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis
+        # Change into your image name
+        # image: lucernae/qgis-debug-mode
+        # Command are looped to restart debug session
+        command: /bin/bash -c "while [ 'TRUE' ]; do gdbserver 0.0.0.0:34567 /QGIS/build/output/bin/qgis; done"
         ports: 
+            # The port should be the same with whatever gdbserver port you used
             - "34567:34567"
+        environment:
+            # Enable DISPLAY below if you want to view it over VNC
+            # DISPLAY: ":98"
+            DISPLAY: ":99"
+        volumes:
+            # Mount any cache/source you need
+            - $PWD/user_scripts:/user_scripts
+            # Mount extra entrypoint scripts
+            # - $PWD/sample_debugger_scripts/gdb/remote_gdb_server.sh:/docker-entrypoint-scripts.d/remote_gdb_server.sh
