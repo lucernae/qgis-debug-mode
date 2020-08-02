@@ -238,3 +238,39 @@ From the debug console, execute:
 
 You can debug Python code (for plugins) using PyCharm Pro edition.
 
+#### Requirements
+
+- PyCharm Professional Edition
+
+Debugging using PyCharm Debug Server is a little bit different in architecture.
+Using GDB, you instantiate debug server inside the **container**.
+But, using PyCharm Debug Server, the pydevd debug server is instantiated in your **host** machine, the place where you run PyCharm itself.
+That means your containers need to be able to access your host machine to access debug server.
+
+If you add Debug Server configuration in PyCharm there are some instructions PyCharm will provide for you, it can be broken down in two step
+
+1. Install pydevd-pycharm package with specific version inside your container
+
+Add the following extra keys to your `docker-compose.override.yml`
+
+```yaml
+version: '3'
+services:
+    qgis:
+        environment:
+            PYCHARM_VERSION: "your-pycharm-version"
+        volumes:
+            - ${PWD}/resources/sample_debugger_scripts/pydevd/remote_pydevd_client.sh:/docker-entrypoint-scripts.d/remote_pydevd_client.sh
+        ports:
+            # This will be your pydevd ports
+            - "34568:34568"
+```
+
+2. Copy paste the stack trace code into your plugin's `__init__.py` script.
+
+```python3
+import pydevd
+pydevd_pycharm.settrace('<host>', port=34568, stdoutToServer=True, stderrToServer=True)
+```
+
+Replace '<host>'  with the ipaddress of your network bridge. You can check by using `ifconfig` and see your WiFi/Ethernet or Docker Bridge interface

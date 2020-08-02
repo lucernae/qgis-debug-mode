@@ -8,6 +8,7 @@ services:
             # Use :99 for default XVfb
             # Use :98 for default VNC
             DISPLAY: ":99"
+            PYCHARM_VERSION: "${PYCHARM_VERSION}"
         ports: 
             - "${VNC_PORT}:5998"
             - "${SSH_PORT}:22"
